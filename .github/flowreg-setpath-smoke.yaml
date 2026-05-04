@@ -1,0 +1,71 @@
+name: FlowReg set_path smoke test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  set-path:
+    name: MATLAB ${{ matrix.matlab-release }} on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        matlab-release:
+          - R2023b
+          - R2024a
+          - R2024b
+          - R2025a
+          - R2025b
+        runner:
+          - macos-14
+          - macos-15
+          - macos-26
+        include:
+          - runner: macos-14
+            xcode: /Applications/Xcode_15.4.app
+
+          - runner: macos-15
+            xcode: /Applications/Xcode_16.4.app
+
+          - runner: macos-26
+            xcode: /Applications/Xcode.app
+
+    steps:
+      - name: Check out FlowReg
+        uses: actions/checkout@v4
+        with:
+          repository: FlowRegSuite/flow_registration
+          path: flow_registration
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "${{ matrix.xcode }}"
+
+      - name: Show compiler environment
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --find clang++
+          clang++ --version
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: ${{ matrix.matlab-release }}
+
+      - name: Run set_path
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            cd(fullfile(getenv("GITHUB_WORKSPACE"), "flow_registration"));
+
+            fprintf("MATLAB version: %s\n", version);
+            fprintf("Architecture: %s\n", computer("arch"));
+            fprintf("MEX extension: %s\n", mexext);
+
+            mex -setup C++;
+            set_path;
+
+            mexFile = fullfile("core", "level_solver." + mexext);
+            assert(isfile(mexFile), ...
+                "Expected level_solver MEX file was not created: %s", mexFile);
